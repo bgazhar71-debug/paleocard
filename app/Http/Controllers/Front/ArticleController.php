@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Http\Controllers\Front;
+
+use App\Models\Article;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use BaconQrCode\Writer;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+
+class ArticleController extends Controller
+{
+    public function index()
+    {
+        $keyword = request()->keyword;
+        
+        if ($keyword) {
+            $articles = Article::with('Category')
+                ->whereStatus(1)
+                ->where('title', 'like', '%' . $keyword . '%')
+                ->latest()
+                ->paginate(6);
+        } else {
+            $articles = Article::with('Category')
+                ->whereStatus(1)
+                ->latest()
+                ->paginate(6);
+        }
+
+        return view('front.article.index', [
+            'articles' => $articles,
+            'keyword' => $keyword,
+        ]);
+    }
+    public function show($slug)
+    {
+        $article = Article::whereSlug($slug)->firstOrFail();
+        $article->increment('views');
+
+        $comments = $article->comments()->with('user')->latest()->get();
+
+        return view('front.article.show', [
+            'article' => $article,
+            'comments' => $comments,
+        ]);
+    }
+
+    public function storeComment(Request $request, $slug)
+    {
+        $request->validate([
+            'comment_text' => 'required|string|max:1000',
+        ]);
+
+        $article = Article::whereSlug($slug)->firstOrFail();
+
+        $article->comments()->create([
+            'user_id' => Auth::id(),
+            'comment_text' => $request->comment_text,
+        ]);
+
+        return redirect()->route('front.article.show', $slug)->with('success', 'Comment added successfully.');
+    }
+
+    public function deleteComment($commentId)
+    {
+        $comment = \App\Models\Comment::findOrFail($commentId);
+
+        if ($comment->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $comment->delete();
+
+        return redirect()->back()->with('success', 'Komentar berhasil dihapus.');
+    }
+
+    public function generateQr($slug)
+    {
+        $article = Article::whereSlug($slug)->firstOrFail();
+        $url = route('front.article.show', $slug);
+
+        $renderer = new ImageRenderer(
+            new RendererStyle(300),
+            new SvgImageBackEnd()
+        );
+        $writer = new Writer($renderer);
+        $qrCode = $writer->writeString($url);
+
+        return response($qrCode)
+            ->header('Content-Type', 'image/svg+xml')
+            ->header('Content-Disposition', 'attachment; filename="qr-' . $slug . '.svg"');
+    }
+}
