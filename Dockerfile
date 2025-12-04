@@ -15,27 +15,16 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set workdir
+# Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first (biar cache ga boros)
-COPY composer.json composer.lock ./
-
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
-
-# Copy the rest of the project
+# Copy application files
 COPY . .
 
-# Pastikan storage writable
-RUN chmod -R 775 storage/ bootstrap/cache
+# Install PHP dependencies
+RUN composer install --optimize-autoloader --no-dev
 
-# DO NOT generate app key here — biar runtime yang handle
-# Nanti di Railway pakai:
-# railway variables set APP_KEY=$(php artisan key:generate --show)
 
-# Expose port (Railway pakai PORT var)
-EXPOSE ${PORT}
+EXPOSE ${PORT:-8000}
 
-# Start Laravel
-CMD php artisan serve --host=0.0.0.0 --port=${PORT}
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
