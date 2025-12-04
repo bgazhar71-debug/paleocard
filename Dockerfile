@@ -1,4 +1,4 @@
-FROM php:8.2-fpm
+FROM php:8.2
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -15,19 +15,27 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
+# Set workdir
 WORKDIR /var/www/html
 
-# Copy application files
-COPY . .
+# Copy composer files first (biar cache ga boros)
+COPY composer.json composer.lock ./
 
 # Install PHP dependencies
-RUN composer install --optimize-autoloader --no-dev
+RUN composer install --no-dev --optimize-autoloader
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage
+# Copy the rest of the project
+COPY . .
 
-EXPOSE ${PORT:-8000}
+# Pastikan storage writable
+RUN chmod -R 775 storage/ bootstrap/cache
 
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+# DO NOT generate app key here — biar runtime yang handle
+# Nanti di Railway pakai:
+# railway variables set APP_KEY=$(php artisan key:generate --show)
+
+# Expose port (Railway pakai PORT var)
+EXPOSE ${PORT}
+
+# Start Laravel
+CMD php artisan serve --host=0.0.0.0 --port=${PORT}
