@@ -10,14 +10,21 @@ WORKDIR /var/www/html
 
 COPY . .
 
-# Pastikan storage & cache dibuat sebelum composer
-RUN mkdir -p storage/framework/{cache,sessions,views} \
-    && mkdir -p bootstrap/cache \
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Buat folder storage & cache setelah composer selesai
+RUN mkdir -p storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    bootstrap/cache \
     && chmod -R 777 storage bootstrap/cache
 
-RUN composer install --no-dev --optimize-autoloader
-
+# Bikin storage link (kalau gagal, lanjut saja)
 RUN php artisan storage:link || true
+
+# Laravel butuh key kalau APP_KEY belum ada
+RUN php artisan key:generate --force || true
 
 EXPOSE 8080
 
