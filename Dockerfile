@@ -10,11 +10,13 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN chmod -R 777 storage bootstrap/cache
+# Pastikan storage & cache dibuat sebelum composer
+RUN mkdir -p storage/framework/{cache,sessions,views} \
+    && mkdir -p bootstrap/cache \
+    && chmod -R 777 storage bootstrap/cache
 
 RUN composer install --no-dev --optimize-autoloader
 
-# Buat storage symlink
 RUN php artisan storage:link || true
 
 EXPOSE 8080
